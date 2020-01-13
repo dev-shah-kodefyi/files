@@ -1,0 +1,90 @@
+......................
+Docker file for apache-
+---------------------------------------------------------
+#Base Image
+FROM ubuntu:16.04
+
+#Maintainer
+MAINTAINER Chirag Vasani
+
+#Apt-get Repo
+RUN apt-get update
+
+#Install Apache Packages
+RUN apt-get install apache2 -y
+
+#Copy the code inside container
+COPY index.html /var/www/html/index
+
+#EXPOSE
+EXPOSE 80
+
+#Start Apache service
+CMD ["/usr/sbin/apache2ctl","-D","FOREGROUND"]
+------------------------------------------------------
+
+docker build -t image_name .
+docker run -d -p 8081:80  --name container_name image_name 
+docker inspect con_id
+
+Enter inside the container --> docker exec -it 927137ac0c10 /bin/bash
+------------------------------------------------
+.....................
+Docker sonarqube
+Docker jfrog
+-----------------
+
+..........................
+Docker file for Java app--> spring-boot
+-----------------
+# Base Image
+FROM openjdk:8
+
+# Create DIR
+RUN mkdir -p /usr/src/myapp
+
+# COPY APPLICTAION COde
+COPY target/jar_file    /usr/src/myapp
+
+# Setup Working DIR
+WORKDIR /usr/src/myapp
+
+#EXPOSE
+EXPOSE 8080
+
+# Start the Bot Service
+CMD ["java", "-jar", "jar_file"]
+------------------
+docker build -t java_app .
+ docker run -d -p 8083:8080 --name container_name image_name
+
+
+
+
+.......................
+Docker file for tomcat-->Gol prooject	
+-------------------------------------------
+FROM tomcat:8.0
+
+RUN echo 'Deploying War on Server'
+
+COPY /gameoflife-web/target/gameoflife.war /usr/local/tomcat/webapps
+--------------------------------------------
+docker container run -d  -p 8083:8080 --name container_name image_name
+
+
+
+ mysql -u root -p
+
+
+
+other commands:-
+docker exec -it 927137ac0c10 /bin/bash
+docker inspect dockerid
+
+---------explore------
+kill
+commit
+CMD vs ENTRYPOINT 
+push image to docker hub
+tagging the image
