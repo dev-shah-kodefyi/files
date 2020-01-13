@@ -1,0 +1,168 @@
+pipeline {
+    agent any
+    environment{
+        registry="devops311/demoremo"
+        registryCredential='devops311'
+        dockerImage=''
+    }
+    stages {
+        
+stage('Git CheckOut') {    
+    steps{
+    git  'https://github.com/devops311/demo.git'
+
+script{
+            FAILED_STAGE=env.STAGE_NAME
+            }
+}}
+    
+        stage('Maven Clean')
+        {
+            steps{
+                dir("/var/lib/jenkins/workspace/exam/company")
+            {
+              sh 'mvn clean '  
+            }
+            script{
+            FAILED_STAGE=env.STAGE_NAME
+            }
+            }
+         }
+         
+         
+         stage(' Maven Compile') {
+    
+    steps{
+        dir("/var/lib/jenkins/workspace/exam/company"){
+      sh label: 'Compile', script: 'mvn compile'
+}
+script{
+            FAILED_STAGE=env.STAGE_NAME
+            }
+}
+}
+    
+      stage('Sonar Analysis'){
+              steps{
+                  withSonarQubeEnv('sonarQube'){
+                sh "/opt/sonar_scanner/bin/sonar-runner -D sonar.projectKey=environ -D sonar.sources=/var/lib/jenkins/workspace/exam/company/src"
+           } }
+        }
+        
+  stage("Quality Gate"){
+      steps{
+        timeout(time: 1, unit: 'HOURS') {
+       // waitForQualityGate abortPipeline: true 
+            }
+        }
+      }
+                stage('Maven Install') {
+    
+    steps{
+        dir("/var/lib/jenkins/workspace/exam/company"){
+      sh label: 'Install', script: 'mvn install'
+}
+script{
+            FAILED_STAGE=env.STAGE_NAME
+            }
+}
+}
+    
+       stage('Jfrog Artifacory'){
+        steps{
+        dir("/var/lib/jenkins/workspace/exam/company"){
+      script{
+        def server= Artifactory.server 'jenkins-artifactory'
+                    def uploadSpec= """{
+                        "files": [{
+                        "pattern": "target/*.jar",
+                        "target": "fulldemo"}]
+                    }"""
+        server.upload(uploadSpec)
+     }}
+     }
+     }
+     stage('Jfrog Artifacory download'){
+    steps{
+    script{
+        def server= Artifactory.server 'jenkins-artifactory'
+                    def downloadartifact= """{
+                        "files": [{
+                        "pattern": "fulldemo/*.jar",
+                        "target": "/var/lib/jenkins/Pipeline_artifact/"}]
+                    }"""
+        server.download(downloadartifact)
+    }
+}
+}
+//stage("Creating Instance "){
+        //    steps{
+        //        dir("/var/lib/jenkins/workspace/exam/company"){
+        //            sh 'terraform init'
+        //            sh 'terraform apply -input=false -auto-approve'
+                    
+                    
+        //        }
+        //    }
+       // }
+
+    stage('Creating image Of Project') {
+     steps{
+         
+        dir("/var/lib/jenkins/workspace/exam/company")
+
+        {
+            script {
+                dockerImage=docker.build registry + ":$BUILD_NUMBER"
+            }
+        }
+         
+        }  
+   
+     }
+      stage('Pushing  Image to dockerhub') {
+        steps{
+     script {
+      docker.withRegistry( '', registryCredential ) {
+        dockerImage.push()
+      }
+     }
+        }
+      }
+     
+      stage('Deploying the image in  tomcat server'){
+      steps{
+          script{
+              sh"docker run -d -p 8086:8080 --name fullDemo -v /var/lib/tomcat8/conf/tomcat-users.xml:/usr/local/tomcat/conf/tomcat-users.xml $registry:$BUILD_NUMBER"
+          
+          }
+      }
+  }  
+            
+        
+    }
+   // post {
+     //    always {
+     //       mail to: 'devashishkumar311@gmail.com',
+     //       subject: "Status of pipeline: ${currentBuild.fullDisplayName}",
+     //       body: "stage name: ${FAILED_STAGE}; The Pipeline Has Been Aborted .It... ${env.BUILD_URL} has result ${currentBuild.result}"
+          
+     //    }
+         
+   //  }
+   post {
+      
+          success {
+               mail bcc: '', body: 'Build Succesfull', cc: '', from: '', replyTo: '', subject: 'build status?', to: 'devashishkumar311@gmail.com'  
+          }
+          failure {
+              
+               mail bcc: '', body:"Failed stage name: ${FAILED_STAGE}; This needs to be resolved... ${env.BUILD_URL} has result ${currentBuild.result}", cc: '', from: '', replyTo: '', subject: 'build status', to: 'devashishkumar311@gmail.com'
+         }
+        
+    }
+   
+   
+   
+
+}
