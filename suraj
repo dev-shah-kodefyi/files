@@ -1,0 +1,128 @@
+def FAILED_STAGE
+pipeline {
+    agent any
+    environment {
+    registry = ""
+    registryCredential = 'dockerhubid'
+    
+    }
+    
+  stages{  
+stage('Git CheckOut') {    
+    steps{
+git  branch: 'branch1', url: 'https://github.com/surajkumarsahoo/examrepo.git'
+}
+}
+stage('Clean Old Packages') {
+    steps{
+        dir("/var/lib/jenkins/workspace/Exam_pipeline/Pipeline_challenge-/atmosphere/spring-boot-samples/spring-boot-sample-atmosphere"){
+sh label: 'Clean', script: 'mvn clean'
+}
+}
+}
+stage('Maven Compile') {
+    
+    steps{
+        dir("/var/lib/jenkins/workspace/Exam_pipeline/Pipeline_challenge-/atmosphere/spring-boot-samples/spring-boot-sample-atmosphere"){
+sh label: 'Comile', script: 'mvn compile'
+}
+}
+}
+ stage('sonarqube config'){
+   
+    steps {
+         
+		 
+        withSonarQubeEnv('sonarQube') {
+            sh "/opt/sonar_scanner/bin/sonar-runner -D sonar.projectKey=spring-boot-sample-atmosphere -D sonar.sources=/var/lib/jenkins/workspace/Exam_pipeline/Pipeline_challenge-/atmosphere/spring-boot-samples/spring-boot-sample-atmosphere/src"
+        }
+	 
+        
+     }
+   }
+    
+     stage("Quality Gate") {
+            steps {
+                
+                script{
+                    
+              timeout(time: 1, unit: 'HOURS') {
+                 def qg = waitForQualityGate()
+              if (qg.status != 'OK') {
+                  error "Pipeline aborted due to quality gate failure: ${qg.status}"
+              }
+              }
+                }
+        }
+     }
+stage('Maven install') {
+    steps{
+        dir("/var/lib/jenkins/workspace/Exam_pipeline/Pipeline_challenge-/atmosphere/spring-boot-samples/spring-boot-sample-atmosphere"){
+sh label: 'adding dependency', script: 'mvn install'
+}
+}
+}
+
+stage('Jfrog Artifacory'){
+    steps{
+        dir("/var/lib/jenkins/workspace/Exam_pipeline/Pipeline_challenge-/atmosphere/spring-boot-samples/spring-boot-sample-atmosphere"){
+    script{
+        def server= Artifactory.server 'jenkins-artifactory'
+                    def uploadartifact= """{
+                        "files": [{
+                        "pattern": "target/*.jar",
+                        "target": "myrepo1"}]
+                    }"""
+        server.upload(uploadartifact)
+    }}
+}
+}
+stage('Jfrog Artifacory download'){
+    steps{
+    script{
+        def server= Artifactory.server 'jenkins-artifactory'
+                    def downloadartifact= """{
+                        "files": [{
+                        "pattern": "myrepo1/*.jar",
+                        "target": "/var/lib/jenkins/Pipeline_artifact/"}]
+                    }"""
+        server.download(downloadartifact)
+    }
+}
+}
+
+
+stage('Docker Container'){
+    steps{
+       script{
+            FAILED_STAGE=env.STAGE_NAME
+       }
+        dir("/var/lib/jenkins/workspace/Exam_pipeline/"){
+        sh 'docker build -t atmosimage:$BUILD_NUMBER .'
+        sh 'docker run -d -p 8080:8080 --name atmoscont$BUILD_NUMBER atmosimage:$BUILD_NUMBER'
+    }
+    }
+}
+stage('Docker image push to dockerhub'){
+    steps{
+     script {
+        FAILED_STAGE=env.STAGE_NAME
+      docker.withRegistry( '', registryCredential ) {
+        sh 'docker tag atmosimage:$BUILD_NUMBER 9965/repo1:$BUILD_NUMBER'
+        sh 'docker push $registry:$BUILD_NUMBER'
+    }
+    }
+
+}
+}
+
+}
+ post {
+    always {
+               mail to: 'suraj.sahoo@mindtree.com',
+             subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
+             body: "Something is wrong with ${FAILED_STAGE};"
+    }
+  }
+
+}
