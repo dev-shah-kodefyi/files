@@ -1,0 +1,24 @@
+post {
+         always {
+            mail to: 'devashishkumar311@gmail.com',
+            subject: "Status of pipeline: ${currentBuild.fullDisplayName}",
+            body: "Failed stage name: ${FAILED_STAGE}; The Pipeline Has Been Aborted .It... ${env.BUILD_URL} has result ${currentBuild.result}"
+          
+         }
+         
+     }
+
+
+ script{
+            FAILED_STAGE=env.STAGE_NAME
+            }
+
+
+
+FROM tomcat:9-jre8
+RUN rm -rf /usr/local/tomcat/webapps/*
+
+COPY  target/cafe-0.0.1-SNAPSHOT.war  /usr/local/tomcat/webapps
+
+EXPOSE 8080
+CMD ["catalina.sh", "run"]
