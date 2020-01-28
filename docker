@@ -75,6 +75,7 @@ docker container run -d  -p 8083:8080 --name container_name image_name
 
 
  mysql -u root -p
+ docker run --name some-mysql -e MYSQL_ROOT_PASSWORD=my-secret-pw -d mysql
 
 
 
